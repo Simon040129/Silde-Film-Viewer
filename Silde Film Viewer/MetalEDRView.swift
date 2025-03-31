@@ -5,6 +5,11 @@ struct MetalEDRView: NSViewRepresentable {
     @Binding var centerPosition: CGPoint
     var currentFormat: ContentView.FilmFormat
     var scaleFactor: CGFloat
+    var isFullScreen: Bool
+    var redWeight: Double
+    var greenWeight: Double
+    var blueWeight: Double
+
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -32,6 +37,13 @@ struct MetalEDRView: NSViewRepresentable {
         context.coordinator.centerPosition = centerPosition
         context.coordinator.currentFormat = currentFormat
         context.coordinator.scaleFactor = scaleFactor
+        context.coordinator.isFullScreen = isFullScreen
+        context.coordinator.rgbWeights = SIMD4<Float>(
+            Float(redWeight),
+            Float(greenWeight),
+            Float(blueWeight),
+            0.0
+        )
         nsView.setNeedsDisplay(nsView.bounds)
     }
 
@@ -39,6 +51,10 @@ struct MetalEDRView: NSViewRepresentable {
         var parent: MetalEDRView
         var commandQueue: MTLCommandQueue?
         var pipelineState: MTLRenderPipelineState?
+        var isFullScreen: Bool = false
+        var rgbWeights: SIMD4<Float> = SIMD4<Float>(1.0, 1.0, 1.0, 0.0)
+
+
         
         // 传入的数据
         var centerPosition: CGPoint = .zero
@@ -122,7 +138,7 @@ struct MetalEDRView: NSViewRepresentable {
                   let drawable = view.currentDrawable else { return }
 
             // 1) 清屏黑
-            descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0,0,0,1)
+            descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
             descriptor.colorAttachments[0].loadAction = .clear
             descriptor.colorAttachments[0].storeAction = .store
 
@@ -138,6 +154,9 @@ struct MetalEDRView: NSViewRepresentable {
             // 2) 计算 NDC 坐标：把 centerPosition 转到 [-1..1]
             let screenW = Float(view.drawableSize.width)
             let screenH = Float(view.drawableSize.height)
+            
+            // 确保屏幕尺寸有效，避免除以零
+            guard screenW > 0 && screenH > 0 else { return }
 
             let ndcX = (Float(centerPosition.x) / screenW) * 2.0 - 1.0
             let ndcY = (Float(centerPosition.y) / screenH) * 2.0 - 1.0
@@ -145,20 +164,33 @@ struct MetalEDRView: NSViewRepresentable {
             // 3) 计算实际高亮矩形相对于“默认 -0.5..0.5”方块的 scale
             // baseSize -> scaleFactor -> / screen size -> * 2
             let (baseSize, _) = formatInfo[currentFormat]!
-            let scaledWidth  = Float(baseSize.width  * scaleFactor)
+            let scaledWidth  = Float(baseSize.width * scaleFactor)
             let scaledHeight = Float(baseSize.height * scaleFactor)
 
             // 由于我们的顶点在 -0.5..0.5 之间，这代表1.0 宽高
             // 需要把 scaledWidth / screenW 变成(0..1)区间，再做 *2.0
-            let scaleX = (scaledWidth  / screenW)
+            let scaleX = (scaledWidth / screenW)
             let scaleY = (scaledHeight / screenH)
 
-            // 4) 把这些 offset + scale 传给着色器 (slot 1)
-            var transformData = TransformData(
-                offset: SIMD2<Float>(ndcX, ndcY),
-                scale:  SIMD2<Float>(scaleX, scaleY)
-            )
+            // 4) 根据是否全屏，构造不同的 transformData 并传给着色器 (slot 1)
+            var transformData: TransformData
+            if isFullScreen {
+                // 全屏模式：直接铺满整个屏幕
+                transformData = TransformData(
+                    offset: SIMD2<Float>(0.0, 0.0),
+                    scale: SIMD2<Float>(2.0, 2.0)
+                )
+            } else {
+                // 原有计算：利用 centerPosition 与 scaleFactor 计算高亮矩形的 offset 和 scale
+                transformData = TransformData(
+                    offset: SIMD2<Float>(ndcX, ndcY),
+                    scale: SIMD2<Float>(scaleX, scaleY)
+                )
+            }
             encoder.setVertexBytes(&transformData, length: MemoryLayout<TransformData>.size, index: 1)
+
+            // 4.1) 设置 fragment 字节：传递 rgbWeights 数据给片元着色器 (slot 2)
+            encoder.setFragmentBytes(&self.rgbWeights, length: MemoryLayout<SIMD4<Float>>.size, index: 2)
 
             // 5) 画矩形(6 顶点)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)

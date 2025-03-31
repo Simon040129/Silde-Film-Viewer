@@ -28,8 +28,9 @@ vertex VertexOut simpleVertexShader(VertexIn vin [[stage_in]],
 }
 
 // 片元着色器
-fragment float4 simpleFragmentShader() {
-    // EDR 高亮
-    return float4(10.0, 10.0, 10.0, 1.0);
-//    return float4(0, 0, 10.0, 1.0);
+fragment float4 simpleFragmentShader(constant float4 &rgbWeights [[buffer(2)]]) {
+    float baseValue = 10.0;
+    // 使用 rgbWeights.xyz 来计算，忽略第四个分量
+    return float4(rgbWeights.xyz * baseValue, 1.0);
 }
+

@@ -12,18 +12,26 @@ struct ContentView: View {
     @State private var centerPosition = CGPoint(x: 1550, y: 450)
     @State private var scaleFactor: CGFloat = 3.0
     @State private var currentFormat: FilmFormat = .format135
+    @State private var isFullScreen: Bool = false
+    @State private var redWeight: Double = 1.0
+    @State private var greenWeight: Double = 1.0
+    @State private var blueWeight: Double = 1.0
+
     
     // 3. 键盘监听
     @State private var keyboardMonitor: Any?
     
     var body: some View {
-//        GeometryReader { geometry in
         ZStack(alignment: .leading) {
             // 4. Metal EDR 视图
             MetalEDRView(
                 centerPosition: $centerPosition,
                 currentFormat: currentFormat,
-                scaleFactor: scaleFactor
+                scaleFactor: scaleFactor,
+                isFullScreen: isFullScreen,       // 新增参数
+                redWeight: redWeight,             // 下文RGB混色参数
+                greenWeight: greenWeight,
+                blueWeight: blueWeight
             )
             .edgesIgnoringSafeArea(.all)
             
@@ -46,8 +54,7 @@ struct ContentView: View {
             }
             .padding(.top, 20)
             .padding(.leading, 5)
-            
-            
+
             
             // 3) 右上角：缩放 & 按钮
             //    用一个 VStack + 半透明背景面板
@@ -86,6 +93,15 @@ struct ContentView: View {
                     .background(Color.white.opacity(0.2)) // 按钮背景色（半透明白）
                     .foregroundColor(.white)
                     .cornerRadius(6)  // 圆角
+                    
+                    Button("全屏切换") {
+                        isFullScreen.toggle()
+                    }
+                    .padding(8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -96,23 +112,33 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(.trailing, 5)
             .padding(.top, 20)
+            
+            // 在缩放控制面板下方添加
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Red: \(String(format: "%.2f", redWeight))")
+                    .foregroundColor(.red)
+                Slider(value: $redWeight, in: 0...2)
+                    .frame(width: 150)
+                
+                Text("Green: \(String(format: "%.2f", greenWeight))")
+                    .foregroundColor(.green)
+                Slider(value: $greenWeight, in: 0...2)
+                    .frame(width: 150)
+                
+                Text("Blue: \(String(format: "%.2f", blueWeight))")
+                    .foregroundColor(.blue)
+                Slider(value: $blueWeight, in: 0...2)
+                    .frame(width: 150)
+            }
+            .padding(.top, 20)
         }
         .onAppear {
-//                updateCenterPosition(to: geometry.size)
             // 监听键盘 (方向键 + cmd +/-)
             keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 handleKeyDown(event)
                 return event
             }
         }
-        // 窗口尺寸改变时自动触发
-        // 关键改动：监听窗口resize事件
-//            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { _ in
-//                if let window = NSApplication.shared.windows.first {
-//                    let newSize = window.contentLayoutRect.size
-//                    updateCenterPosition(to: newSize)
-//                }
-//            }
         .onDisappear {
             if let monitor = keyboardMonitor {
                 NSEvent.removeMonitor(monitor)
