@@ -31,4 +31,5 @@ vertex VertexOut simpleVertexShader(VertexIn vin [[stage_in]],
 fragment float4 simpleFragmentShader() {
     // EDR 高亮
     return float4(10.0, 10.0, 10.0, 1.0);
+//    return float4(0, 0, 10.0, 1.0);
 }

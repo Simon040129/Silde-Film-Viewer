@@ -9,7 +9,7 @@ struct ContentView: View {
     
     // 2. 中心位置 & 缩放因子 & 当前画幅
 //    @State private var centerPosition = CGPoint.zero
-    @State private var centerPosition = CGPoint(x: 1550, y: 600)
+    @State private var centerPosition = CGPoint(x: 1550, y: 450)
     @State private var scaleFactor: CGFloat = 3.0
     @State private var currentFormat: FilmFormat = .format135
     
@@ -63,7 +63,7 @@ struct ContentView: View {
                             scaleFactor = newVal
                         }
                     ),
-                    in: 0.5...5.0 // 你可以调整范围
+                    in: 0.5...15.0 // 你可以调整范围
                 )
                 .frame(width: 150)
                 .padding(.bottom, 8)
@@ -79,7 +79,7 @@ struct ContentView: View {
                     .cornerRadius(6)  // 圆角
                     
                     Button("+") {
-                        scaleFactor = min(scaleFactor + 0.1, 5.0)
+                        scaleFactor = min(scaleFactor + 0.1, 15.0)
                     }
                     .padding(.horizontal, 10)  // 按钮内部水平间距
                     .padding(.vertical, 4)     // 按钮内部垂直间距
