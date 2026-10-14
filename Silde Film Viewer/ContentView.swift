@@ -1,158 +1,71 @@
 import SwiftUI
 
 struct ContentView: View {
-    // 1. 画幅选择
-    enum FilmFormat: String, CaseIterable {
-        case format135 = "135"
-        case format120 = "120"
-    }
-    
-    // 2. 中心位置 & 缩放因子 & 当前画幅
-//    @State private var centerPosition = CGPoint.zero
-    @State private var centerPosition = CGPoint(x: 1550, y: 450)
-    @State private var scaleFactor: CGFloat = 3.0
-    @State private var currentFormat: FilmFormat = .format135
-    
-    // 3. 键盘监听
-    @State private var keyboardMonitor: Any?
-    
+    @StateObject private var state = ViewerState()
+
     var body: some View {
-//        GeometryReader { geometry in
-        ZStack(alignment: .leading) {
-            // 4. Metal EDR 视图
-            MetalEDRView(
-                centerPosition: $centerPosition,
-                currentFormat: currentFormat,
-                scaleFactor: scaleFactor
-            )
-            .edgesIgnoringSafeArea(.all)
-            
-            // 左侧：切换画幅
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(FilmFormat.allCases, id: \.self) { format in
-                    Button(action: {
-                        currentFormat = format
-                    }) {
-                        Text(format.rawValue)
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 30, alignment: .center) // 指定明确的按钮尺寸
-                    }
-                    .background(currentFormat == format ? Color.blue : Color.gray)
-                    .cornerRadius(6)
-                    .buttonStyle(PlainButtonStyle()) // 禁用默认样式，避免额外 padding 干扰
-                    .contentShape(Rectangle()) // 确保整个背景可点击
-                }
-                Spacer()
-            }
-            .padding(.top, 20)
-            .padding(.leading, 5)
-            
-            
-            
-            // 3) 右上角：缩放 & 按钮
-            //    用一个 VStack + 半透明背景面板
-            VStack(alignment: .center) {
-                Text("Scale: \(String(format: "%.2f", scaleFactor))")
-                    .foregroundColor(.white)
-                    .padding(.bottom, 4)
-                
-                Slider(
-                    value: Binding(
-                        get: { scaleFactor },
-                        set: { newVal in
-                            scaleFactor = newVal
+        MetalEDRView(state: state)
+            .ignoresSafeArea()
+            .overlay(alignment: .top) {
+                if state.controlsVisible {
+                    VStack(spacing: 10) {
+                        HStack {
+                            Picker("画幅", selection: $state.format) {
+                                ForEach(FilmFormat.allCases) { Text($0.rawValue).tag($0) }
+                            }.frame(width: 150)
+                            Button("恢复位置") { state.resetPosition() }
+                                .help("将亮区恢复到底部居中位置（C）")
+                            Toggle("铺满亮区", isOn: $state.fill)
+                            Button("窗口全屏") { state.window?.toggleFullScreen(nil) }
+                            Button { state.controlsVisible = false; state.focusCanvas?() } label: {
+                                Image(systemName: "eye.slash")
+                            }.help("隐藏控制栏（H 恢复）")
+                            .accessibilityLabel("隐藏控制栏")
                         }
-                    ),
-                    in: 0.5...15.0 // 你可以调整范围
-                )
-                .frame(width: 150)
-                .padding(.bottom, 8)
-                
-                HStack(spacing: 20) {
-                    Button("-") {
-                        scaleFactor = max(scaleFactor - 0.1, 0.5)
+                        HStack {
+                            Text("大小")
+                            Slider(value: $state.scale, in: 0.1...1).disabled(state.fill)
+                            Text(state.scale, format: .percent.precision(.fractionLength(0))).monospacedDigit().frame(width: 45)
+                            Text("EDR 倍率")
+                            Slider(value: $state.gain, in: 1...10)
+                            Text(state.gain, format: .number.precision(.fractionLength(1))).monospacedDigit()
+                        }
+                        DisclosureGroup("白平衡 · RGB 微调") {
+                            HStack {
+                                Text("R"); Slider(value: $state.red, in: 0...2)
+                                Text("G"); Slider(value: $state.green, in: 0...2)
+                                Text("B"); Slider(value: $state.blue, in: 0...2)
+                                Button("中性白") { state.red = 1; state.green = 1; state.blue = 1 }
+                            }
+                            Text("RGB 微调不等同于色彩校准；翻拍请固定显示设置和相机白平衡。")
+                                .font(.caption)
+                        }
+                        Text(state.status).font(.caption).foregroundStyle(.secondary)
+                        Text("点击灯箱后：方向键移动 · ⇧ 精细移动 · ⌘+/− 缩放 · C 恢复位置 · H 隐藏/显示 · Esc 退出全屏")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 10)  // 按钮内部水平间距
-                    .padding(.vertical, 4)     // 按钮内部垂直间距
-                    .background(Color.white.opacity(0.2)) // 按钮背景色（半透明白）
-                    .foregroundColor(.white)
-                    .cornerRadius(6)  // 圆角
-                    
-                    Button("+") {
-                        scaleFactor = min(scaleFactor + 0.1, 15.0)
+                    .padding(12)
+                    .frame(maxWidth: 680)
+                    .foregroundStyle(.white)
+                    .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(white: 0.35), lineWidth: 1))
+                    .padding()
+                } else {
+                    Button {
+                        state.controlsVisible = true
+                        state.focusCanvas?()
+                    } label: {
+                        Label("显示控制栏", systemImage: "eye")
                     }
-                    .padding(.horizontal, 10)  // 按钮内部水平间距
-                    .padding(.vertical, 4)     // 按钮内部垂直间距
-                    .background(Color.white.opacity(0.2)) // 按钮背景色（半透明白）
-                    .foregroundColor(.white)
-                    .cornerRadius(6)  // 圆角
+                    .help("显示控制栏，也可点击灯箱后按 H")
+                    .padding(8)
+                    .foregroundStyle(.white)
+                    .background(Color(white: 0.10), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color(white: 0.35), lineWidth: 1))
+                    .padding(12)
                 }
-                .buttonStyle(PlainButtonStyle())
             }
-            .padding()
-            .background(Color.gray.opacity(0.3)) // 浅灰半透明背景
-            .cornerRadius(10)
-            // 让它在右上角：先让 ZStack 占满，再在右上角对齐
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 5)
-            .padding(.top, 20)
-        }
-        .onAppear {
-//                updateCenterPosition(to: geometry.size)
-            // 监听键盘 (方向键 + cmd +/-)
-            keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                handleKeyDown(event)
-                return event
-            }
-        }
-        // 窗口尺寸改变时自动触发
-        // 关键改动：监听窗口resize事件
-//            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { _ in
-//                if let window = NSApplication.shared.windows.first {
-//                    let newSize = window.contentLayoutRect.size
-//                    updateCenterPosition(to: newSize)
-//                }
-//            }
-        .onDisappear {
-            if let monitor = keyboardMonitor {
-                NSEvent.removeMonitor(monitor)
-            }
-        }
-    }
-//    }
-    
-//    // 封装成单独的方法
-//    private func updateCenterPosition(to size: CGSize) {
-//        centerPosition = CGPoint(x: size.width / 2, y: size.height / 2)
-//    }
-    
-    // MARK: - 处理键盘事件
-    private func handleKeyDown(_ event: NSEvent) {
-        // cmd + "+" / cmd + "-"
-        if event.modifierFlags.contains(.command) {
-            let c = event.charactersIgnoringModifiers
-            switch c {
-            case "=": // "+"
-                scaleFactor = min(scaleFactor + 0.1, 5.0)
-            case "-":
-                scaleFactor = max(scaleFactor - 0.1, 0.5)
-            default: break
-            }
-        }
-        
-        // 方向键
-        let step: CGFloat = 20
-        switch event.keyCode {
-        case 123: // left
-            centerPosition.x -= step
-        case 124: // right
-            centerPosition.x += step
-        case 125: // down
-            centerPosition.y -= step
-        case 126: // up
-            centerPosition.y += step
-        default:
-            break
-        }
+            .preferredColorScheme(.dark)
+            .frame(minWidth: 720, minHeight: 420)
     }
 }

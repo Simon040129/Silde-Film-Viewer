@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct EDRDemoApp: App {
+struct SildeFilmViewerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
