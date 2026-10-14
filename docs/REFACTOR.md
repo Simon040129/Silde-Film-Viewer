@@ -89,3 +89,9 @@ Debug 编译及 6 项单元测试通过，回归覆盖移动后恢复贴底及�
 用户确认使用第二版胶片/放大镜图标；生成 macOS 16–1024 像素资源并修复 AppIcon JSON，旧图标素材迁入 design/legacy-icons 保留。版本号 1.1.0，构建号 2。Release 测试通过；测试命令需 ENABLE_TESTABILITY=YES，分发归档不带该开关及测试插件。
 
 GitHub Release 由 v* 标签触发的 macos-15 工作流完成测试、通用架构归档、ad-hoc 签名、ZIP/SHA256 打包和发布。无 Developer ID 或 Apple 公证。正式图标已经批准替换，不再是待选候选状态。
+
+## 图标铺满修复（本地构建 3）
+
+依据用户截图，移除图标透明外边距及预绘制圆角底座，采用不透明方形底图，由系统应用外侧圆角。保留胶片和观片放大镜设计。源图 design/app-icon-fullbleed-v3.png，完整内置 image_gen 提示词 design/icon-prompt-v3.txt。旧候选和 v1.1.0 标签保留。本次仅更新本地应用，已发布 Release 不覆盖。
+
+官方依据：https://developer.apple.com/design/human-interface-guidelines/app-icons/ 。Xcode 16 仍使用传统资源目录，当前 macOS 上的最终系统图标效果需要用户再次确认。
