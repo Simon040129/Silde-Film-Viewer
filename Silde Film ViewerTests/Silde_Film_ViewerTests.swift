@@ -19,12 +19,18 @@ struct Silde_Film_ViewerTests {
             }
         }
     }
-    @Test func explicitCenterRemainsAvailable() {
+    @Test func resetRestoresBottomAnchor() {
         let state = ViewerState()
         state.viewport = CGSize(width: 1000, height: 800)
-        state.recenter()
+        state.move(dx: 80, dy: -100)
+        state.resetPosition()
         #expect(state.lightRect.midX == 500)
-        #expect(state.lightRect.midY == 400)
+        #expect(state.lightRect.maxY == 800)
+        #expect(state.center == nil)
+        state.viewport = CGSize(width: 1200, height: 900)
+        state.zoom(-0.2)
+        #expect(abs(state.lightRect.maxY - 900) < 0.0001)
+        #expect(state.lightRect.midX == 600)
     }
     @Test func clampsAfterResizeAndOversize() {
         let rect = LightGeometry.rect(in: CGSize(width: 300, height: 200), center: CGPoint(x: -100, y: 900), scale: 15, aspect: 1.5, fill: false)

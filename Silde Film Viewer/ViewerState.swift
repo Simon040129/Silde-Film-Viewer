@@ -55,8 +55,8 @@ final class ViewerState: ObservableObject {
         let clamped = lightRect
         center = CGPoint(x: clamped.midX, y: clamped.midY)
     }
-    func recenter() {
-        center = CGPoint(x: viewport.width / 2, y: viewport.height / 2)
+    func resetPosition() {
+        center = nil
     }
     func zoom(_ delta: Double) { scale = min(max(scale + delta, 0.1), 1) }
 }

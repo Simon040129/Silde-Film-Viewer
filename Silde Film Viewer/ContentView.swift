@@ -13,7 +13,8 @@ struct ContentView: View {
                             Picker("画幅", selection: $state.format) {
                                 ForEach(FilmFormat.allCases) { Text($0.rawValue).tag($0) }
                             }.frame(width: 150)
-                            Button("居中") { state.recenter() }
+                            Button("恢复位置") { state.resetPosition() }
+                                .help("将亮区恢复到底部居中位置（C）")
                             Toggle("铺满亮区", isOn: $state.fill)
                             Button("窗口全屏") { state.window?.toggleFullScreen(nil) }
                             Button { state.controlsVisible = false; state.focusCanvas?() } label: {
@@ -40,12 +41,14 @@ struct ContentView: View {
                                 .font(.caption)
                         }
                         Text(state.status).font(.caption).foregroundStyle(.secondary)
-                        Text("点击灯箱后：方向键移动 · ⇧ 精细移动 · ⌘+/− 缩放 · C 居中 · H 隐藏/显示 · Esc 退出全屏")
+                        Text("点击灯箱后：方向键移动 · ⇧ 精细移动 · ⌘+/− 缩放 · C 恢复位置 · H 隐藏/显示 · Esc 退出全屏")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     .padding(12)
                     .frame(maxWidth: 680)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.white)
+                    .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(white: 0.35), lineWidth: 1))
                     .padding()
                 } else {
                     Button {
@@ -56,7 +59,9 @@ struct ContentView: View {
                     }
                     .help("显示控制栏，也可点击灯箱后按 H")
                     .padding(8)
-                    .background(.regularMaterial, in: Capsule())
+                    .foregroundStyle(.white)
+                    .background(Color(white: 0.10), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color(white: 0.35), lineWidth: 1))
                     .padding(12)
                 }
             }
