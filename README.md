@@ -9,7 +9,7 @@ Silde Film Viewer 是一个 macOS 上的胶片观片辅助工具，充分利用 
 ## 🌟 功能特性 / Features
 
 ### ✅ 中文
-- 💡 **HDR 高亮模式**：激发 XDR 屏幕峰值亮度（最高可达 1600nit）
+- 💡 **HDR 高亮模式**：按所在屏幕的当前 EDR 余量输出高亮；不保证固定 nit
 - 🖤 **纯黑背景 + 白色高亮区域**，聚焦视觉避免杂光干扰
 - 🎞 **支持“135 / 120”胶片画幅切换**，适应不同底片尺寸
 - 🔍 **高亮区域支持位置移动、缩放调节**（方向键控制，或 ⌘+/− 快捷键）
@@ -17,7 +17,7 @@ Silde Film Viewer 是一个 macOS 上的胶片观片辅助工具，充分利用 
 - 🎛 **简洁 UI 适配翻拍流程**，配合数码相机使用时特别方便
 
 ### ✅ English
-- 💡 **HDR Highlight Mode**: Activates Mac XDR screen’s peak brightness (up to 1600 nits)
+- 💡 **HDR Highlight Mode**: Adapts to the current display EDR headroom; no fixed luminance guarantee
 - 🖤 **Full black background with adjustable white highlight region**
 - 🎞 **Supports film aspect ratios like 135 (3:2) and 120 (6x9)**
 - 🎛 **Movable and scalable highlight window** (arrow keys, ⌘+/−)
@@ -60,8 +60,8 @@ Silde Film Viewer
 ---
 
 ## 🔧 开发与环境 / Development
-- macOS 13+
-- Xcode 15+
+- macOS 15+
+- Xcode 16+
 - SwiftUI + Metal + Swift 5.9+
 
 ---
@@ -69,11 +69,11 @@ Silde Film Viewer
 ## 📦 安装构建 / Build Instructions
 ```bash
 # 克隆项目
-$ git clone https://github.com/yourname/SildeFilmViewer.git
-$ cd SildeFilmViewer
+$ git clone https://github.com/Simon040129/Silde-Film-Viewer.git
+$ cd Silde-Film-Viewer
 
 # 使用 Xcode 打开工程并运行
-$ open SildeFilmViewer.xcodeproj
+$ open "Silde Film Viewer.xcodeproj"
 ```
 
 ---
@@ -89,3 +89,11 @@ MIT License.
 ---
 
 Made with ❤️ for film photographers by [SimonWei].
+
+## 重构分支操作说明
+
+先点击灯箱获取键盘焦点；方向键移动，Shift+方向键精细移动，⌘+/− 缩放，C 居中，H 隐藏/显示控制栏，Esc 退出窗口全屏。控件获得焦点时保留其原生键盘行为。系统亮度键由 macOS 处理，部分参考模式可能禁用。
+
+大小表示相对画布的适配比例（10%–100%），不是毫米尺寸。135 与当前 120（6×9 横向）均为 3:2。铺满亮区与窗口全屏相互独立。RGB 微调使用共同倍率限制峰值，不能替代测量校准。
+
+架构、官方依据、原始问题和验证边界见 [重构记录](docs/REFACTOR.md)。

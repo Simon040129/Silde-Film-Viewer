@@ -2,177 +2,128 @@ import SwiftUI
 import MetalKit
 
 struct MetalEDRView: NSViewRepresentable {
-    @Binding var centerPosition: CGPoint
-    var currentFormat: ContentView.FilmFormat
-    var scaleFactor: CGFloat
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    func makeNSView(context: Context) -> MTKView {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            fatalError("No Metal device found")
-        }
-        let mtkView = MTKView(frame: .zero, device: device)
-        mtkView.colorPixelFormat = .rgba16Float
-        mtkView.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)
-        
-        if let layer = mtkView.layer as? CAMetalLayer {
-            layer.wantsExtendedDynamicRangeContent = true
-        }
-        
-        mtkView.enableSetNeedsDisplay = true
-        mtkView.isPaused = true
-        mtkView.delegate = context.coordinator
-        return mtkView
-    }
-
-    func updateNSView(_ nsView: MTKView, context: Context) {
-        context.coordinator.centerPosition = centerPosition
-        context.coordinator.currentFormat = currentFormat
-        context.coordinator.scaleFactor = scaleFactor
-        nsView.setNeedsDisplay(nsView.bounds)
-    }
-
-    class Coordinator: NSObject, MTKViewDelegate {
-        var parent: MetalEDRView
-        var commandQueue: MTLCommandQueue?
-        var pipelineState: MTLRenderPipelineState?
-        
-        // 传入的数据
-        var centerPosition: CGPoint = .zero
-        var currentFormat: ContentView.FilmFormat = .format135
-        var scaleFactor: CGFloat = 3.0
-
-        // 记录画幅信息
-        let formatInfo: [ContentView.FilmFormat: (baseSize: CGSize, aspect: CGSize)] = [
-            .format135: (CGSize(width: 900, height: 300), CGSize(width: 3, height: 2)),
-            .format120: (CGSize(width: 900, height: 550), CGSize(width: 6, height: 4))
-        ]
-
-        // 顶点缓冲:
-        var vertexBuffer: MTLBuffer?
-
-        init(_ parent: MetalEDRView) {
-            self.parent = parent
-            super.init()
-            setupMetal()
-        }
-
-        private func setupMetal() {
-            guard let device = MTLCreateSystemDefaultDevice() else { return }
-            self.commandQueue = device.makeCommandQueue()
-
-            // 1) 加载 .metal 着色器
-            let library = try! device.makeDefaultLibrary(bundle: .main)
-            let vertexFunc = library.makeFunction(name: "simpleVertexShader")
-            let fragFunc   = library.makeFunction(name: "simpleFragmentShader")
-
-            // 2) 创建渲染管线描述
-            let pipelineDesc = MTLRenderPipelineDescriptor()
-            pipelineDesc.vertexFunction = vertexFunc
-            pipelineDesc.fragmentFunction = fragFunc
-            pipelineDesc.colorAttachments[0].pixelFormat = .rgba16Float
-
-            // 3) 设置 vertexDescriptor
-            let mtlVertexDescriptor = MTLVertexDescriptor()
-            mtlVertexDescriptor.attributes[0].format = .float2
-            mtlVertexDescriptor.attributes[0].offset = 0
-            mtlVertexDescriptor.attributes[0].bufferIndex = 0
-
-            mtlVertexDescriptor.layouts[0].stride = MemoryLayout<Float>.size * 2
-            mtlVertexDescriptor.layouts[0].stepRate = 1
-            mtlVertexDescriptor.layouts[0].stepFunction = .perVertex
-
-            pipelineDesc.vertexDescriptor = mtlVertexDescriptor
-
-            // 4) 创建渲染管线
-            self.pipelineState = try! device.makeRenderPipelineState(descriptor: pipelineDesc)
-
-            // 注意：顶点数据可以在 draw(in:) 动态生成。但这里也可先做一个默认的 [-0.5..0.5]方块
-            // 我们稍后在 draw(in:) 中修改 offset & scale
-            let squareVertices: [Float] = [
-                // 第1个三角形
-                -0.5, -0.5,
-                 0.5, -0.5,
-                -0.5,  0.5,
-
-                // 第2个三角形
-                -0.5,  0.5,
-                 0.5, -0.5,
-                 0.5,  0.5
-            ]
-
-            self.vertexBuffer = device.makeBuffer(
-                bytes: squareVertices,
-                length: squareVertices.count * MemoryLayout<Float>.size,
-                options: []
-            )
-        }
-
-        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-            // do nothing
-        }
-
-        func draw(in view: MTKView) {
-            guard let pipelineState = pipelineState,
-                  let commandQueue = commandQueue,
-                  let descriptor = view.currentRenderPassDescriptor,
-                  let drawable = view.currentDrawable else { return }
-
-            // 1) 清屏黑
-            descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0,0,0,1)
-            descriptor.colorAttachments[0].loadAction = .clear
-            descriptor.colorAttachments[0].storeAction = .store
-
-            let commandBuffer = commandQueue.makeCommandBuffer()!
-            let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)!
-            encoder.setRenderPipelineState(pipelineState)
-
-            // 设置顶点缓冲
-            if let vb = vertexBuffer {
-                encoder.setVertexBuffer(vb, offset: 0, index: 0)
-            }
-
-            // 2) 计算 NDC 坐标：把 centerPosition 转到 [-1..1]
-            let screenW = Float(view.drawableSize.width)
-            let screenH = Float(view.drawableSize.height)
-
-            let ndcX = (Float(centerPosition.x) / screenW) * 2.0 - 1.0
-            let ndcY = (Float(centerPosition.y) / screenH) * 2.0 - 1.0
-
-            // 3) 计算实际高亮矩形相对于“默认 -0.5..0.5”方块的 scale
-            // baseSize -> scaleFactor -> / screen size -> * 2
-            let (baseSize, _) = formatInfo[currentFormat]!
-            let scaledWidth  = Float(baseSize.width  * scaleFactor)
-            let scaledHeight = Float(baseSize.height * scaleFactor)
-
-            // 由于我们的顶点在 -0.5..0.5 之间，这代表1.0 宽高
-            // 需要把 scaledWidth / screenW 变成(0..1)区间，再做 *2.0
-            let scaleX = (scaledWidth  / screenW)
-            let scaleY = (scaledHeight / screenH)
-
-            // 4) 把这些 offset + scale 传给着色器 (slot 1)
-            var transformData = TransformData(
-                offset: SIMD2<Float>(ndcX, ndcY),
-                scale:  SIMD2<Float>(scaleX, scaleY)
-            )
-            encoder.setVertexBytes(&transformData, length: MemoryLayout<TransformData>.size, index: 1)
-
-            // 5) 画矩形(6 顶点)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-            encoder.endEncoding()
-
-            commandBuffer.present(drawable)
-            commandBuffer.commit()
-        }
-    }
+    @ObservedObject var state: ViewerState
+    func makeNSView(context: Context) -> LightTableView { LightTableView(state: state) }
+    func updateNSView(_ view: LightTableView, context: Context) { view.needsDisplay = true }
 }
 
-// 你在 .metal 里可以定义更复杂的结构。
-// 这里在 Swift 里定义一下 transformData，对应顶点函数中的 constant
-struct TransformData {
-    var offset: SIMD2<Float>
-    var scale:  SIMD2<Float>
+final class LightTableView: MTKView, MTKViewDelegate {
+    private let state: ViewerState
+    private var queue: MTLCommandQueue?
+    private var pipeline: MTLRenderPipelineState?
+    private var observers: [NSObjectProtocol] = []
+    private var failure: String?
+    override var acceptsFirstResponder: Bool { true }
+
+    init(state: ViewerState) {
+        self.state = state
+        let device = MTLCreateSystemDefaultDevice()
+        super.init(frame: .zero, device: device)
+        colorPixelFormat = .rgba16Float
+        colorspace = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)
+        (layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent = true
+        clearColor = MTLClearColorMake(0, 0, 0, 1)
+        isPaused = true
+        enableSetNeedsDisplay = true
+        delegate = self
+        do {
+            guard let device, let queue = device.makeCommandQueue() else {
+                throw RendererError.unavailable
+            }
+            self.queue = queue
+            let library = try device.makeDefaultLibrary(bundle: .main)
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = library.makeFunction(name: "simpleVertexShader")
+            descriptor.fragmentFunction = library.makeFunction(name: "simpleFragmentShader")
+            descriptor.colorAttachments[0].pixelFormat = colorPixelFormat
+            pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+        } catch { failure = "Metal 渲染不可用：\(error.localizedDescription)" }
+    }
+    required init(coder: NSCoder) { fatalError("Storyboard initialization is unsupported") }
+    enum RendererError: Error { case unavailable }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        state.window = window
+        state.focusCanvas = { [weak self] in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self)
+        }
+        guard let window else { return }
+        for name in [NSWindow.didChangeScreenNotification, NSWindow.didChangeBackingPropertiesNotification,
+                     NSWindow.didResizeNotification, NSWindow.didEnterFullScreenNotification,
+                     NSWindow.didExitFullScreenNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                self?.refreshDisplay()
+            })
+        }
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.refreshDisplay()
+        })
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self)
+            self.refreshDisplay()
+        }
+    }
+    deinit { observers.forEach(NotificationCenter.default.removeObserver) }
+
+    private func refreshDisplay() {
+        state.viewport = bounds.size
+        let headroom = max(window?.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1, 1)
+        state.headroom = headroom
+        state.status = failure ?? "\(window?.screen?.localizedName ?? "显示器") · 当前 EDR 余量 \(String(format: "%.1f", headroom))×（非 nit 测量）"
+        needsDisplay = true
+    }
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        // Drawable uses pixels; model and NDC conversion both use local points.
+        DispatchQueue.main.async { [weak self] in self?.refreshDisplay() }
+    }
+    override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self) }
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+        if flags == .command || flags == [.command, .shift] {
+            if key == "=" || key == "+" { state.zoom(0.05); return }
+            if key == "-" { state.zoom(-0.05); return }
+        }
+        guard flags.isEmpty || flags == .shift else { super.keyDown(with: event); return }
+        let step: CGFloat = flags.contains(.shift) ? 1 : 10
+        switch event.keyCode {
+        case 123: state.move(dx: -step, dy: 0)
+        case 124: state.move(dx: step, dy: 0)
+        case 125: state.move(dx: 0, dy: step)
+        case 126: state.move(dx: 0, dy: -step)
+        case 53:
+            if window?.styleMask.contains(.fullScreen) == true { window?.toggleFullScreen(nil) }
+            else { state.controlsVisible = true }
+        default:
+            if key == "c" { state.center = nil }
+            else if key == "h" { state.controlsVisible.toggle() }
+            else { super.keyDown(with: event) }
+        }
+    }
+    func draw(in view: MTKView) {
+        guard bounds.width > 0, bounds.height > 0, let pipeline, let queue,
+              let pass = currentRenderPassDescriptor, let drawable = currentDrawable,
+              let command = queue.makeCommandBuffer(), let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
+        state.viewport = bounds.size
+        let rect = state.lightRect
+        var transform = SIMD4<Float>(Float(rect.midX / bounds.width * 2 - 1),
+                                     Float(1 - rect.midY / bounds.height * 2),
+                                     Float(rect.width / bounds.width * 2),
+                                     Float(rect.height / bounds.height * 2))
+        let headroom = Float(window?.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1)
+        var color = LightGeometry.color(gain: Float(state.gain), headroom: headroom,
+                                       rgb: SIMD3(Float(state.red), Float(state.green), Float(state.blue)))
+        encoder.setRenderPipelineState(pipeline)
+        encoder.setVertexBytes(&transform, length: MemoryLayout<SIMD4<Float>>.stride, index: 1)
+        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD4<Float>>.stride, index: 2)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        encoder.endEncoding()
+        command.present(drawable)
+        command.commit()
+    }
 }
