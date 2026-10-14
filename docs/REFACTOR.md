@@ -83,3 +83,9 @@ EDR 1.0 是相对 SDR 白，不是固定 nit。具体 XDR 机型的 1600 nit HDR
 Debug 编译及 6 项单元测试通过，回归覆盖移动后恢复贴底及随后 resize/zoom。实际 EDR 视觉对比度待用户在真机确认。原图标 JSON 冲突警告仍存在。
 
 新图标候选稿保存为 design/app-icon-candidate-v1.png，完整生成提示词见 design/icon-prompt.txt。使用内置 image_gen 生成，已预览主体和构图，尚未替换正式图标或生成生产尺寸资源集。
+
+## 1.1.0 发布准备
+
+用户确认使用第二版胶片/放大镜图标；生成 macOS 16–1024 像素资源并修复 AppIcon JSON，旧图标素材迁入 design/legacy-icons 保留。版本号 1.1.0，构建号 2。Release 测试通过；测试命令需 ENABLE_TESTABILITY=YES，分发归档不带该开关及测试插件。
+
+GitHub Release 由 v* 标签触发的 macos-15 工作流完成测试、通用架构归档、ad-hoc 签名、ZIP/SHA256 打包和发布。无 Developer ID 或 Apple 公证。正式图标已经批准替换，不再是待选候选状态。
