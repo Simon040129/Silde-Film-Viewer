@@ -95,3 +95,7 @@ GitHub Release 由 v* 标签触发的 macos-15 工作流完成测试、通用架
 依据用户截图，移除图标透明外边距及预绘制圆角底座，采用不透明方形底图，由系统应用外侧圆角。保留胶片和观片放大镜设计。源图 design/app-icon-fullbleed-v3.png，完整内置 image_gen 提示词 design/icon-prompt-v3.txt。旧候选和 v1.1.0 标签保留。本次仅更新本地应用，已发布 Release 不覆盖。
 
 官方依据：https://developer.apple.com/design/human-interface-guidelines/app-icons/ 。Xcode 16 仍使用传统资源目录，当前 macOS 上的最终系统图标效果需要用户再次确认。
+
+## 1.1.1 发布
+
+从 OneDrive 主项目发布图标铺满修复，版本 1.1.1 / 构建 4。Release 配置下 6 项单元测试通过，arm64+x86_64 通用归档成功。分发包使用 ad-hoc 签名并附 SHA256；未进行 Apple 公证。保留 main 和 1.1.0 标签/下载包。
