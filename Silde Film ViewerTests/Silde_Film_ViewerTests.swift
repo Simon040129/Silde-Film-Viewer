@@ -3,12 +3,28 @@ import Foundation
 @testable import Silde_Film_Viewer
 
 struct Silde_Film_ViewerTests {
-    @Test func centeredAndAspectCorrect() {
+    @Test func bottomAlignedAndAspectCorrect() {
         let rect = LightGeometry.rect(in: CGSize(width: 1000, height: 800), center: nil, scale: 0.6, aspect: 1.5, fill: false)
         #expect(rect.midX == 500)
-        #expect(rect.midY == 400)
+        #expect(rect.maxY == 800)
         #expect(rect.width == 600)
         #expect(rect.height == 400)
+    }
+    @Test func bottomAnchorFollowsResizeAndZoom() {
+        for size in [CGSize(width: 720, height: 420), CGSize(width: 1600, height: 1000)] {
+            for scale: CGFloat in [0.1, 0.6, 1] {
+                let rect = LightGeometry.rect(in: size, center: nil, scale: scale, aspect: 1.5, fill: false)
+                #expect(abs(rect.maxY - size.height) < 0.0001)
+                #expect(abs(rect.midX - size.width / 2) < 0.0001)
+            }
+        }
+    }
+    @Test func explicitCenterRemainsAvailable() {
+        let state = ViewerState()
+        state.viewport = CGSize(width: 1000, height: 800)
+        state.recenter()
+        #expect(state.lightRect.midX == 500)
+        #expect(state.lightRect.midY == 400)
     }
     @Test func clampsAfterResizeAndOversize() {
         let rect = LightGeometry.rect(in: CGSize(width: 300, height: 200), center: CGPoint(x: -100, y: 900), scale: 15, aspect: 1.5, fill: false)

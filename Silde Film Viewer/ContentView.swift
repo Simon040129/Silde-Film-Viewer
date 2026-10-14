@@ -13,12 +13,13 @@ struct ContentView: View {
                             Picker("画幅", selection: $state.format) {
                                 ForEach(FilmFormat.allCases) { Text($0.rawValue).tag($0) }
                             }.frame(width: 150)
-                            Button("居中") { state.center = nil }
+                            Button("居中") { state.recenter() }
                             Toggle("铺满亮区", isOn: $state.fill)
                             Button("窗口全屏") { state.window?.toggleFullScreen(nil) }
                             Button { state.controlsVisible = false; state.focusCanvas?() } label: {
                                 Image(systemName: "eye.slash")
                             }.help("隐藏控制栏（H 恢复）")
+                            .accessibilityLabel("隐藏控制栏")
                         }
                         HStack {
                             Text("大小")
@@ -46,6 +47,17 @@ struct ContentView: View {
                     .frame(maxWidth: 680)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                     .padding()
+                } else {
+                    Button {
+                        state.controlsVisible = true
+                        state.focusCanvas?()
+                    } label: {
+                        Label("显示控制栏", systemImage: "eye")
+                    }
+                    .help("显示控制栏，也可点击灯箱后按 H")
+                    .padding(8)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(12)
                 }
             }
             .preferredColorScheme(.dark)

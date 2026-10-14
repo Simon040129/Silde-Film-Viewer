@@ -100,7 +100,7 @@ final class LightTableView: MTKView, MTKViewDelegate {
             if window?.styleMask.contains(.fullScreen) == true { window?.toggleFullScreen(nil) }
             else { state.controlsVisible = true }
         default:
-            if key == "c" { state.center = nil }
+            if key == "c" { state.recenter() }
             else if key == "h" { state.controlsVisible.toggle() }
             else { super.keyDown(with: event) }
         }

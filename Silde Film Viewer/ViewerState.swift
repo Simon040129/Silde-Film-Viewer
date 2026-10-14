@@ -15,7 +15,8 @@ struct LightGeometry {
         let fittedWidth = min(size.width, size.height * aspect)
         let width = fittedWidth * min(max(scale, 0.1), 1)
         let height = width / aspect
-        let requested = center ?? CGPoint(x: size.width / 2, y: size.height / 2)
+        // Until manually positioned, anchor the light to the bottom as the canvas resizes.
+        let requested = center ?? CGPoint(x: size.width / 2, y: size.height - height / 2)
         let x = min(max(requested.x, width / 2), size.width - width / 2)
         let y = min(max(requested.y, height / 2), size.height - height / 2)
         return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
@@ -53,6 +54,9 @@ final class ViewerState: ObservableObject {
         center = CGPoint(x: rect.midX + dx, y: rect.midY + dy)
         let clamped = lightRect
         center = CGPoint(x: clamped.midX, y: clamped.midY)
+    }
+    func recenter() {
+        center = CGPoint(x: viewport.width / 2, y: viewport.height / 2)
     }
     func zoom(_ delta: Double) { scale = min(max(scale + delta, 0.1), 1) }
 }
